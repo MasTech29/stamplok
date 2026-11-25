@@ -19,25 +19,25 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 #splash h1{font-size:28px;letter-spacing:2px}
 #splash h1 span{color:#22c55e}
 #splash p{color:#888;font-size:13px}
-.stamp{position:fixed;left:12px;bottom:115px;z-index:10;background:rgba(0,0,0,.72);border-left:4px solid #22c55e;padding:10px 12px;border-radius:0 12px 12px 0;max-width:92vw;line-height:1.45}
+.stamp{position:fixed;left:12px;bottom:118px;z-index:10;background:rgba(0,0,0,.72);border-left:4px solid #22c55e;padding:10px 12px;border-radius:0 12px 12px 0;max-width:92vw;line-height:1.45}
 .stamp .r1{font-size:15px;font-weight:700}
 .stamp .r1 span{color:#22c55e}
 .stamp .r2{font-size:12px;color:#cbd5e1}
 .stamp .r3{font-size:12px;color:#fbbf24}
 .stamp .r4{font-size:11px;color:#94a3b8;word-break:break-word}
 .stamp .r5{font-size:11px;color:#22c55e}
-.controls{position:fixed;bottom:0;left:0;right:0;padding:10px 20px 8px;display:flex;justify-content:space-between;align-items:center;z-index:10;background:linear-gradient(transparent,#000)}
+.controls{position:fixed;bottom:22px;left:0;right:0;padding:10px 20px 8px;display:flex;justify-content:space-between;align-items:center;z-index:10;background:linear-gradient(transparent,#000)}
 #snap{width:72px;height:72px;border-radius:50%;border:4px solid #22c55e;background:#fff;cursor:pointer}
 .btn{width:50px;height:50px;border-radius:50%;background:#1e293b;border:1px solid #444;color:#fff;font-size:20px}
 .mini{width:50px;height:50px;border-radius:10px;overflow:hidden;border:2px solid #22c55e;background:#222;cursor:pointer}
 .mini img{width:100%;height:100%;object-fit:cover}
-.footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10px;color:#64748b;padding:3px;z-index:9;background:#000}
+.footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:11px;color:#94a3b8;padding:5px;background:#000;z-index:11;border-top:1px solid #1e293b}
+.footer b{color:#22c55e}
 #canvas{display:none}
 #result{position:fixed;inset:0;background:#000;z-index:20;display:none;flex-direction:column}
 #result img{width:100%;flex:1;object-fit:contain}
-#result div{padding:14px;display:flex;gap:10px}
-#result button{flex:1;padding:14px;border:none;border-radius:10px;font-weight:bold}
-/* GALERI */
+#result div{padding:14px;display:flex;gap:10px;flex-wrap:wrap}
+#result button{flex:1;padding:14px;border:none;border-radius:10px;font-weight:bold;min-width:100px}
 #galeri{position:fixed;inset:0;background:#000;z-index:30;display:none;flex-direction:column}
 #galeri .top{padding:14px;display:flex;justify-content:space-between;align-items:center}
 #galeri .top b{font-size:18px}
@@ -48,10 +48,12 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 #grid .item p{font-size:10px;padding:6px;color:#cbd5e1;background:#111}
 #grid .del{position:absolute;top:5px;right:5px;background:red;border:none;color:#fff;border-radius:50%;width:26px;height:26px}
 #empty{text-align:center;color:#666;margin-top:60px;font-size:13px}
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#22c55e;color:#000;padding:10px 16px;border-radius:20px;font-size:13px;font-weight:bold;z-index:50;display:none}
 </style>
 </head>
 <body>
 <div id="splash"><img src="icon-192.png" onerror="this.style.display='none'"><h1>STAMP<span>LOK</span></h1><p>Stempel Waktu & Lokasi, Sekali Jepret</p><p style="color:#22c55e">by MasTech29</p></div>
+<div id="toast">✅ Tersimpan ke Galeri HP!</div>
 <video id="video" autoplay playsinline muted></video>
 <div class="header"><b>◉ STAMPLOK</b><span id="statusGPS">📍 Mencari GPS...</span></div>
 <div class="stamp">
@@ -66,26 +68,22 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 <button id="snap" onclick="jepret()"></button>
 <button class="btn" onclick="switchCam()">🔄</button>
 </div>
-<div class="footer">© 2026 MasTech29 - StampLok. All Rights Reserved.</div>
-
+<div class="footer">© 2026 <b>MasTech29</b> - StampLok. All Rights Reserved.</div>
 <canvas id="canvas"></canvas>
-
-<!-- HASIL FOTO - GAK ADA DOWNLOAD LAGI -->
-<div id="result"><img id="hasilImg"><div><button style="background:#334155;color:#fff" onclick="ulangi()">Ulangi</button><button style="background:#22c55e" onclick="simpanKeGaleri()">💾 Simpan ke Galeri</button><button style="background:#fff" onclick="share()">📤 Share</button></div></div>
-
-<!-- GALERI -->
+<div id="result"><img id="hasilImg"><div><button style="background:#334155;color:#fff" onclick="ulangi()">Ulangi</button><button style="background:#22c55e" onclick="simpanKeGaleriHP()">📸 Simpan ke Galeri HP</button><button style="background:#fff" onclick="share()">📤 Share</button></div><p style="text-align:center;font-size:11px;color:#94a3b8;padding:0 14px 14px">© 2026 MasTech29 - Foto otomatis tersimpan di Galeri Aplikasi & Galeri HP</p></div>
 <div id="galeri">
 <div class="top"><b>🖼️ Galeri StampLok</b><button onclick="tutupGaleri()">✕ Tutup</button></div>
 <div id="grid"></div>
 <div id="empty">Belum ada foto bro.<br>Jepret dulu, langsung ke-save disini.</div>
+<p style="text-align:center;font-size:11px;color:#64748b;padding:10px">© 2026 MasTech29 - StampLok</p>
 </div>
-
 <script>
 setTimeout(()=>{ document.getElementById('splash').style.display='none'; },1500);
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 let stream, facing='environment', lat=0, lon=0, heading=0, alt=0, speed=0, alamatTxt='Mencari lokasi...';
 let galeriData = JSON.parse(localStorage.getItem('stamplok_galeri')||'[]');
-
+let folderHandle = null;
+function showToast(t){ let el=document.getElementById('toast'); el.innerText=t; el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
 async function startCam(){
   if(stream) stream.getTracks().forEach(t=>t.stop());
   try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false}); document.getElementById('video').srcObject=stream; }catch(e){ alert('Izinin kamera dulu bro'); }
@@ -116,28 +114,52 @@ function jepret(){
   if(!v.videoWidth){ alert('Kamera belum siap bro'); return; }
   c.width=v.videoWidth; c.height=v.videoHeight; let ctx=c.getContext('2d'); ctx.drawImage(v,0,0);
   let {tgl,jam,id}=updateJam(); let w=c.width, h=c.height;
-  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,h-230,w,230); ctx.fillStyle='#22c55e'; ctx.fillRect(0,h-230,12,230);
-  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(w*0.028)+'px Arial'; ctx.fillText('STAMPLOK  |  '+tgl+'  |  '+jam, 30, h-180);
-  ctx.font=Math.round(w*0.022)+'px Arial'; ctx.fillStyle='#cbd5e1'; ctx.fillText('Lat '+lat.toFixed(6)+'  |  Lon '+lon.toFixed(6), 30, h-140);
-  ctx.fillStyle='#fbbf24'; ctx.fillText('Arah '+heading+' derajat  |  Alt '+alt+'m  |  Kec '+speed+' km/j', 30, h-105);
-  ctx.fillStyle='#94a3b8'; ctx.font=Math.round(w*0.02)+'px Arial'; let alm = alamatTxt.length>75?alamatTxt.slice(0,75)+'...':alamatTxt; ctx.fillText(alm, 30, h-70);
-  ctx.fillStyle='#22c55e'; ctx.fillText('ID: '+id+'  |  © MasTech29', 30, h-35);
-  let url=c.toDataURL('image/jpeg',0.85);
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,h-250,w,250); ctx.fillStyle='#22c55e'; ctx.fillRect(0,h-250,12,250);
+  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(w*0.028)+'px Arial'; ctx.fillText('STAMPLOK  |  '+tgl+'  |  '+jam, 30, h-200);
+  ctx.font=Math.round(w*0.022)+'px Arial'; ctx.fillStyle='#cbd5e1'; ctx.fillText('Lat '+lat.toFixed(6)+'  |  Lon '+lon.toFixed(6), 30, h-160);
+  ctx.fillStyle='#fbbf24'; ctx.fillText('Arah '+heading+' derajat  |  Alt '+alt+'m  |  Kec '+speed+' km/j', 30, h-125);
+  ctx.fillStyle='#94a3b8'; ctx.font=Math.round(w*0.02)+'px Arial'; let alm = alamatTxt.length>75?alamatTxt.slice(0,75)+'...':alamatTxt; ctx.fillText(alm, 30, h-90);
+  ctx.fillStyle='#22c55e'; ctx.fillText('ID: '+id, 30, h-55);
+  ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(w*0.02)+'px Arial'; ctx.fillText('(c) 2026 MasTech29 - StampLok', 30, h-25);
+  let url=c.toDataURL('image/jpeg',0.9);
   document.getElementById('hasilImg').src=url; document.getElementById('thumb').src=url;
   document.getElementById('result').style.display='flex'; window.lastFoto=url; window.lastInfo=tgl+' | '+jam;
-  // OTOMATIS MASUK GALERI - TANPA PERLU PENCET APA-APA
   simpanOtomatis(url, window.lastInfo);
 }
 function simpanOtomatis(url, info){
   galeriData.unshift({img:url, info:info, time:Date.now()});
-  if(galeriData.length>30) galeriData.pop(); // max 30 foto biar ga penuh
-  localStorage.setItem('stamplok_galeri', JSON.stringify(galeriData));
+  if(galeriData.length>30) galeriData.pop();
+  try{ localStorage.setItem('stamplok_galeri', JSON.stringify(galeriData)); }catch(e){}
   renderGaleri();
 }
-function simpanKeGaleri(){ alert('Udah ke-save otomatis di Galeri bro!'); tutupHasilKeGaleri(); }
-function tutupHasilKeGaleri(){ document.getElementById('result').style.display='none'; bukaGaleri(); }
+async function simpanKeGaleriHP(){
+  try{
+    let blob = await (await fetch(window.lastFoto)).blob();
+    let nama = 'StampLok_'+Date.now()+'.jpg';
+    if(window.showDirectoryPicker){
+      if(!folderHandle){
+        showToast('Pilih Folder Pictures / StampLok bro...');
+        folderHandle = await window.showDirectoryPicker({mode:'readwrite'});
+      }
+      let fileHandle = await folderHandle.getFileHandle(nama, {create:true});
+      let writable = await fileHandle.createWritable();
+      await writable.write(blob); await writable.close();
+      showToast('✅ Tersimpan ke Galeri HP!');
+      return;
+    }
+    if(window.showSaveFilePicker){
+      let handle = await window.showSaveFilePicker({suggestedName:nama, types:[{description:'JPEG Image', accept:{'image/jpeg':['.jpg']}}]});
+      let writable = await handle.createWritable(); await writable.write(blob); await writable.close();
+      showToast('✅ Tersimpan ke Galeri HP!');
+      return;
+    }
+    let a = document.createElement('a'); a.href=window.lastFoto; a.download=nama; document.body.appendChild(a); a.click(); a.remove();
+    showToast('✅ Tersimpan! Cek Galeri HP -> Download');
+  }catch(e){ console.log(e); }
+}
+function simpanKeGaleri(){ simpanKeGaleriHP(); }
 function ulangi(){ document.getElementById('result').style.display='none'; }
-async function share(){ try{ let r=await fetch(window.lastFoto); let b=await r.blob(); let f=new File([b],'stamplok.jpg',{type:'image/jpeg'}); await navigator.share({files:[f]}); }catch(e){ alert('Share gagal, coba buka di Chrome'); } }
+async function share(){ try{ let r=await fetch(window.lastFoto); let b=await r.blob(); let f=new File([b],'stamplok.jpg',{type:'image/jpeg'}); await navigator.share({files:[f], title:'StampLok by MasTech29'}); }catch(e){ alert('Share gagal, pake Simpan ke Galeri HP aja bro'); } }
 function bukaGaleri(){ renderGaleri(); document.getElementById('galeri').style.display='flex'; }
 function tutupGaleri(){ document.getElementById('galeri').style.display='none'; }
 function renderGaleri(){
