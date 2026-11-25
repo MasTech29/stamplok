@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>StampLok - Stempel Waktu & Lokasi</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22c55e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="StampLok">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;height:100dvh}
+#video{width:100vw;height:100dvh;object-fit:cover;position:fixed;top:0;left:0}
+/* HEADER */
+.header{position:fixed;top:0;left:0;right:0;padding:14px;display:flex;justify-content:space-between;z-index:10}
+.header b{background:#22c55e;color:#000;padding:7px 13px;border-radius:9px;font-size:13px;letter-spacing:1px}
+.header span{background:rgba(0,0,0,.65);padding:7px 11px;border-radius:20px;font-size:12px}
+/* SPLASH */
+#splash{position:fixed;inset:0;background:#000;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+#splash img{width:110px;height:110px;border-radius:24px}
+#splash h1{font-size:28px;letter-spacing:2px}
+#splash h1 span{color:#22c55e}
+#splash p{color:#888;font-size:13px}
+/* STEMPEL KIRI BAWAH - CIRI KHAS STAMPLOK */
+.stamp{position:fixed;left:12px;bottom:115px;z-index:10;background:rgba(0,0,0,.72);border-left:4px solid #22c55e;padding:10px 12px;border-radius:0 12px 12px 0;max-width:92vw;line-height:1.45;backdrop-filter:blur(4px)}
+.stamp .r1{font-size:15px;font-weight:700}
+.stamp .r1 span{color:#22c55e}
+.stamp .r2{font-size:12px;color:#cbd5e1}
+.stamp .r3{font-size:12px;color:#fbbf24}
+.stamp .r4{font-size:11px;color:#94a3b8;word-break:break-word}
+.stamp .r5{font-size:11px;color:#22c55e}
+/* CONTROLS */
+.controls{position:fixed;bottom:0;left:0;right:0;padding:16px 20px 22px;display:flex;justify-content:space-between;align-items:center;z-index:10;background:linear-gradient(transparent,#000)}
+#snap{width:72px;height:72px;border-radius:50%;border:4px solid #22c55e;background:#fff;cursor:pointer}
+.btn{width:50px;height:50px;border-radius:50%;background:#1e293b;border:1px solid #444;color:#fff;font-size:20px}
+.mini{width:50px;height:50px;border-radius:10px;overflow:hidden;border:2px solid #22c55e;background:#222}
+.mini img{width:100%;height:100%;object-fit:cover}
+#canvas{display:none}
+#result{position:fixed;inset:0;background:#000;z-index:20;display:none;flex-direction:column}
+#result img{width:100%;flex:1;object-fit:contain}
+#result div{padding:14px;display:flex;gap:10px}
+#result button{flex:1;padding:14px;border:none;border-radius:10px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+<img src="icon-192.png" onerror="this.style.display='none'">
+<h1>STAMP<span>LOK</span></h1>
+<p>Stempel Waktu & Lokasi, Sekali Jepret</p>
+</div>
+
+<video id="video" autoplay playsinline muted></video>
+<div class="header"><b>◉ STAMPLOK</b><span id="statusGPS">📍 Mencari GPS...</span></div>
+
+<div class="stamp">
+<div class="r1"><span>●</span> <span id="tgl">-</span> | <span id="jam">-</span></div>
+<div class="r2" id="koor">Lat - | Lon -</div>
+<div class="r3" id="arah">🧭 - | Alt - | Kec -</div>
+<div class="r4" id="alamat">Mencari lokasi...</div>
+<div class="r5" id="idFoto">ID: SPL-</div>
+</div>
+
+<div class="controls">
+<div class="mini"><img id="thumb" src=""></div>
+<button id="snap" onclick="jepret()"></button>
+<button class="btn" onclick="switchCam()">🔄</button>
+</div>
+
+<canvas id="canvas"></canvas>
+<div id="result"><img id="hasilImg"><div><button style="background:#334155;color:#fff" onclick="ulangi()">Ulangi</button><button style="background:#22c55e" onclick="download()">⬇ Download</button><button style="background:#fff" onclick="share()">📤 Share</button></div></div>
+
+<script>
+// Splash hilang 1.5 detik
+setTimeout(()=>{ document.getElementById('splash').style.display='none'; },1500);
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
+
+let stream, facing='environment', lat=0, lon=0, heading=0, alt=0, speed=0, alamatTxt='Mencari lokasi...';
+
+async function startCam(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false});
+    document.getElementById('video').srcObject=stream;
+  }catch(e){ alert('Izinin kamera dulu bro, di setting Chrome > Izin Situs'); }
+}
+function switchCam(){ facing=facing==='environment'?'user':'environment'; startCam(); }
+
+function updateJam(){
+  let n=new Date();
+  let hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][n.getDay()];
+  let tgl = hari+', '+String(n.getDate()).padStart(2,'0')+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+n.getFullYear();
+  let jam = String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0')+' WIB';
+  let id = 'SPL-'+n.getFullYear()+String(n.getMonth()+1).padStart(2,'0')+String(n.getDate()).padStart(2,'0')+'-'+String(n.getHours()).padStart(2,'0')+String(n.getMinutes()).padStart(2,'0')+String(n.getSeconds()).padStart(2,'0');
+  document.getElementById('tgl').innerText=tgl;
+  document.getElementById('jam').innerText=jam;
+  document.getElementById('idFoto').innerText='ID: '+id;
+  return {tgl,jam,id};
+}
+setInterval(updateJam,1000); updateJam();
+
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(async pos=>{
+    lat=pos.coords.latitude; lon=pos.coords.longitude;
+    alt=Math.round(pos.coords.altitude||0); speed=Math.round((pos.coords.speed||0)*3.6);
+    document.getElementById('koor').innerText='Lat '+lat.toFixed(6)+' | Lon '+lon.toFixed(6);
+    document.getElementById('statusGPS').innerText='📍 GPS Aktif';
+    try{
+      let r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lon);
+      let j=await r.json(); alamatTxt=j.display_name||alamatTxt;
+      document.getElementById('alamat').innerText=alamatTxt.split(',').slice(0,4).join(',');
+    }catch(e){}
+  },()=>{ document.getElementById('statusGPS').innerText='📍 Nyalain GPS bro'; },{enableHighAccuracy:true});
+}
+
+window.addEventListener('deviceorientation',e=>{
+  if(e.alpha!=null){ heading=Math.round(360-e.alpha);
+    let a=['Utara','Timur Laut','Timur','Tenggara','Selatan','Barat Daya','Barat','Barat Laut'][Math.round(heading/45)%8];
+    document.getElementById('arah').innerText='🧭 '+heading+'° '+a+' | Alt '+alt+'m | Kec '+speed+' km/j';
+  }
+});
+
+function jepret(){
+  let v=document.getElementById('video'); let c=document.getElementById('canvas');
+  if(!v.videoWidth){ alert('Kamera belum siap bro, tunggu bentar'); return; }
+  c.width=v.videoWidth; c.height=v.videoHeight; let ctx=c.getContext('2d');
+  ctx.drawImage(v,0,0);
+  let {tgl,jam,id}=updateJam();
+  let w=c.width, h=c.height;
+  // Stempel di foto - sama kayak preview
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,h-230,w,230);
+  ctx.fillStyle='#22c55e'; ctx.fillRect(0,h-230,12,230);
+  ctx.textAlign='left'; ctx.fillStyle='#fff';
+  ctx.font='bold '+Math.round(w*0.028)+'px Arial';
+  ctx.fillText('STAMPLOK  |  '+tgl+'  |  '+jam, 30, h-180);
+  ctx.font=Math.round(w*0.022)+'px Arial'; ctx.fillStyle='#cbd5e1';
+  ctx.fillText('Lat '+lat.toFixed(6)+'  |  Lon '+lon.toFixed(6), 30, h-140);
+  ctx.fillStyle='#fbbf24'; ctx.fillText('Arah '+heading+' derajat  |  Alt '+alt+'m  |  Kec '+speed+' km/j', 30, h-105);
+  ctx.fillStyle='#94a3b8'; ctx.font=Math.round(w*0.02)+'px Arial';
+  let alm = alamatTxt.length>75?alamatTxt.slice(0,75)+'...':alamatTxt;
+  ctx.fillText(alm, 30, h-70);
+  ctx.fillStyle='#22c55e'; ctx.fillText('ID: '+id+'  |  (c) StampLok 2026', 30, h-35);
+  let url=c.toDataURL('image/jpeg',0.95);
+  document.getElementById('hasilImg').src=url; document.getElementById('thumb').src=url;
+  document.getElementById('result').style.display='flex'; window.lastFoto=url;
+}
+function ulangi(){ document.getElementById('result').style.display='none'; }
+function download(){ let a=document.createElement('a'); a.href=window.lastFoto; a.download='stamplok_'+Date.now()+'.jpg'; a.click(); }
+async function share(){ try{ let r=await fetch(window.lastFoto); let b=await r.blob(); let f=new File([b],'stamplok.jpg',{type:'image/jpeg'}); await navigator.share({files:[f]}); }catch(e){ alert('Pake Download aja bro'); } }
+startCam();
+</script>
+</body>
+</html>
