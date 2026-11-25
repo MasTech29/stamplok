@@ -1,4 +1,4 @@
-const CACHE = 'stamplok-v2';
+const CACHE = 'stamplok-v3';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./','./index.html','./manifest.json'])));
   self.skipWaiting();
