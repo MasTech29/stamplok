@@ -14,6 +14,9 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 .header{position:fixed;top:0;left:0;right:0;padding:14px;display:flex;justify-content:space-between;z-index:10}
 .header b{background:#22c55e;color:#000;padding:7px 13px;border-radius:9px;font-size:13px;letter-spacing:1px}
 .header span{background:rgba(0,0,0,.65);padding:7px 11px;border-radius:20px;font-size:12px}
+#topBtns{position:fixed;top:52px;right:12px;z-index:10;display:flex;gap:8px}
+#topBtns button{background:rgba(0,0,0,.65);border:1px solid #444;color:#fff;padding:8px 10px;border-radius:20px;font-size:16px;cursor:pointer}
+#topBtns button.on{background:#22c55e;color:#000;border-color:#22c55e}
 #splash{position:fixed;inset:0;background:#000;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
 #splash img{width:110px;height:110px;border-radius:24px}
 #splash h1{font-size:28px;letter-spacing:2px}
@@ -49,13 +52,22 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 #grid .del{position:absolute;top:5px;right:5px;background:red;border:none;color:#fff;border-radius:50%;width:26px;height:26px}
 #empty{text-align:center;color:#666;margin-top:60px;font-size:13px}
 #toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#22c55e;color:#000;padding:10px 16px;border-radius:20px;font-size:13px;font-weight:bold;z-index:50;display:none}
+#focusBox{position:fixed;width:70px;height:70px;border:2px solid #22c55e;border-radius:50%;z-index:9;display:none;pointer-events:none}
+#folderInfo{position:fixed;top:92px;left:12px;z-index:10;background:rgba(0,0,0,.6);padding:5px 9px;border-radius:12px;font-size:11px;color:#a7f3d0;display:none}
 </style>
 </head>
 <body>
 <div id="splash"><img src="icon-192.png" onerror="this.style.display='none'"><h1>STAMP<span>LOK</span></h1><p>Stempel Waktu & Lokasi, Sekali Jepret</p><p style="color:#22c55e">by MasTech29</p></div>
 <div id="toast">✅ Tersimpan ke Galeri HP!</div>
 <video id="video" autoplay playsinline muted></video>
+<div id="focusBox"></div>
 <div class="header"><b>◉ STAMPLOK</b><span id="statusGPS">📍 Mencari GPS...</span></div>
+<div id="topBtns">
+  <button id="btnFlash" onclick="toggleFlash()" title="Flash">⚡</button>
+  <button id="btnFocus" onclick="autoFocus()" title="Fokus Otomatis">🎯</button>
+  <button onclick="gantiFolder()" title="Ganti Folder">📁</button>
+</div>
+<div id="folderInfo">📁 Folder tersimpan ✓</div>
 <div class="stamp">
 <div class="r1"><span>●</span> <span id="tgl">-</span> | <span id="jam">-</span></div>
 <div class="r2" id="koor">Lat - | Lon -</div>
@@ -83,12 +95,117 @@ if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 let stream, facing='environment', lat=0, lon=0, heading=0, alt=0, speed=0, alamatTxt='Mencari lokasi...';
 let galeriData = JSON.parse(localStorage.getItem('stamplok_galeri')||'[]');
 let folderHandle = null;
+let flashOn = false;
+
+// ===== 1. FOLDER INGAT SELAMANYA (IndexedDB) =====
+function idb(){
+  return new Promise((res,rej)=>{
+    let r=indexedDB.open('stamplok-db',1);
+    r.onupgradeneeded=()=>{ r.result.createObjectStore('keys'); };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+}
+async function saveFolderHandle(h){
+  try{ let db=await idb(); let tx=db.transaction('keys','readwrite'); tx.objectStore('keys').put(h,'folder'); }catch(e){}
+}
+async function loadFolderHandle(){
+  try{ let db=await idb(); return new Promise(res=>{ let tx=db.transaction('keys','readonly'); let q=tx.objectStore('keys').get('folder'); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }); }catch(e){ return null; }
+}
+async function verifyPermission(h, readWrite){
+  let opts={mode: readWrite?'readwrite':'read'};
+  if(await h.queryPermission(opts)==='granted') return true;
+  if(await h.requestPermission(opts)==='granted') return true;
+  return false;
+}
+// Coba ambil folder lama pas buka app, tanpa nanya picker
+async function restoreFolder(){
+  if(!window.showDirectoryPicker) return;
+  folderHandle = await loadFolderHandle();
+  if(folderHandle){
+    let ok = await verifyPermission(folderHandle, true);
+    if(ok){
+      document.getElementById('folderInfo').style.display='block';
+      document.getElementById('folderInfo').innerText='📁 Folder: '+folderHandle.name+' ✓ Tersimpan';
+    } else { folderHandle=null; }
+  }
+}
+restoreFolder();
+async function gantiFolder(){
+  try{
+    let h = await window.showDirectoryPicker({mode:'readwrite'});
+    folderHandle=h; await saveFolderHandle(h);
+    document.getElementById('folderInfo').style.display='block';
+    document.getElementById('folderInfo').innerText='📁 Folder: '+h.name+' ✓ Tersimpan';
+    showToast('✅ Folder diganti & diingat!');
+  }catch(e){}
+}
+
 function showToast(t){ let el=document.getElementById('toast'); el.innerText=t; el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
+
+// ===== 2. KAMERA + FLASH + FOKUS =====
 async function startCam(){
   if(stream) stream.getTracks().forEach(t=>t.stop());
-  try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false}); document.getElementById('video').srcObject=stream; }catch(e){ alert('Izinin kamera dulu bro'); }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing, width:{ideal:1920}, height:{ideal:1080}},audio:false});
+    document.getElementById('video').srcObject=stream;
+    flashOn=false; document.getElementById('btnFlash').classList.remove('on');
+    // Fokus otomatis continuous kalo HP support
+    let track=stream.getVideoTracks()[0];
+    try{ let caps=track.getCapabilities(); if(caps.focusMode && caps.focusMode.includes('continuous')){ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); } }catch(e){}
+  }catch(e){ alert('Izinin kamera dulu bro'); }
 }
 function switchCam(){ facing=facing==='environment'?'user':'environment'; startCam(); }
+
+// FLASH / SENTER
+async function toggleFlash(){
+  let track=stream && stream.getVideoTracks()[0];
+  if(!track){ showToast('Kamera belum siap'); return; }
+  let caps=track.getCapabilities();
+  if(!caps.torch){ showToast('HP ini ga support flash di web bro, pake senter HP aja'); return; }
+  try{
+    flashOn=!flashOn;
+    await track.applyConstraints({advanced:[{torch:flashOn}]});
+    document.getElementById('btnFlash').classList.toggle('on', flashOn);
+    showToast(flashOn?'⚡ Flash ON':'⚡ Flash OFF');
+  }catch(e){ showToast('Flash gagal bro'); }
+}
+// FOKUS - Tap layar / Tombol
+async function autoFocus(){
+  let track=stream && stream.getVideoTracks()[0];
+  if(!track) return;
+  try{
+    let caps=track.getCapabilities();
+    if(caps.focusMode){
+      // Coba manual fokus jarak menengah dulu, balik ke continuous
+      if(caps.focusMode.includes('manual') && caps.focusDistance){
+        await track.applyConstraints({advanced:[{focusMode:'manual', focusDistance:0.5}]});
+        setTimeout(async()=>{ try{ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){} },800);
+      } else if(caps.focusMode.includes('single-shot')){
+        await track.applyConstraints({advanced:[{focusMode:'single-shot'}]});
+      }
+    }
+    showToast('🎯 Fokus!');
+  }catch(e){ showToast('Fokus otomatis HP bro'); }
+}
+// Tap di video = fokus disitu
+document.getElementById('video').addEventListener('click', async (e)=>{
+  let box=document.getElementById('focusBox');
+  box.style.left=(e.clientX-35)+'px'; box.style.top=(e.clientY-35)+'px'; box.style.display='block';
+  setTimeout(()=>box.style.display='none',700);
+  // Kirim titik fokus kalo support pointsOfInterest
+  let track=stream && stream.getVideoTracks()[0];
+  if(track){
+    try{
+      let caps=track.getCapabilities();
+      if(caps.pointsOfInterest){
+        let x=e.clientX/window.innerWidth, y=e.clientY/window.innerHeight;
+        await track.applyConstraints({advanced:[{pointsOfInterest:[{x:x,y:y}]}]});
+      }
+    }catch(err){}
+  }
+  autoFocus();
+});
+
 function updateJam(){
   let n=new Date(); let hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][n.getDay()];
   let tgl = hari+', '+String(n.getDate()).padStart(2,'0')+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+n.getFullYear();
@@ -138,8 +255,15 @@ async function simpanKeGaleriHP(){
     let nama = 'StampLok_'+Date.now()+'.jpg';
     if(window.showDirectoryPicker){
       if(!folderHandle){
-        showToast('Pilih Folder Pictures / StampLok bro...');
+        showToast('Pilih Folder Pictures / StampLok bro... (terakhir kali)');
         folderHandle = await window.showDirectoryPicker({mode:'readwrite'});
+        await saveFolderHandle(folderHandle);
+        document.getElementById('folderInfo').style.display='block';
+        document.getElementById('folderInfo').innerText='📁 Folder: '+folderHandle.name+' ✓ Tersimpan';
+      } else {
+        // Cek izin masih ada ga, kalo ga ada minta izin cepet (bukan pilih folder baru)
+        let ok = await verifyPermission(folderHandle, true);
+        if(!ok){ showToast('Izin folder habis, pilih lagi bro'); folderHandle=null; return simpanKeGaleriHP(); }
       }
       let fileHandle = await folderHandle.getFileHandle(nama, {create:true});
       let writable = await fileHandle.createWritable();
