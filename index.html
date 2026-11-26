@@ -30,15 +30,20 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 .stamp .r4{font-size:11px;color:#94a3b8;word-break:break-word}
 .stamp .r5{font-size:11px;color:#22c55e}
 .controls{position:fixed;bottom:22px;left:0;right:0;padding:10px 20px 8px;display:flex;justify-content:space-between;align-items:center;z-index:10;background:linear-gradient(transparent,#000)}
-#snap{width:72px;height:72px;border-radius:50%;border:4px solid #22c55e;background:#fff;cursor:pointer}
+#snap{width:72px;height:72px;border-radius:50%;border:4px solid #22c55e;background:#fff;cursor:pointer;transition:.2s}
+#snap.videoMode{background:#ef4444;border-color:#fff}
+#snap.recording{animation:blink 1s infinite;transform:scale(1.1)}
+@keyframes blink{50%{opacity:.5}}
 .btn{width:50px;height:50px;border-radius:50%;background:#1e293b;border:1px solid #444;color:#fff;font-size:20px}
+.btn.active{background:#22c55e;color:#000}
 .mini{width:50px;height:50px;border-radius:10px;overflow:hidden;border:2px solid #22c55e;background:#222;cursor:pointer}
 .mini img{width:100%;height:100%;object-fit:cover}
 .footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:11px;color:#94a3b8;padding:5px;background:#000;z-index:11;border-top:1px solid #1e293b}
 .footer b{color:#22c55e}
 #canvas{display:none}
+#recCanvas{display:none}
 #result{position:fixed;inset:0;background:#000;z-index:20;display:none;flex-direction:column}
-#result img{width:100%;flex:1;object-fit:contain}
+#result img,#result video{width:100%;flex:1;object-fit:contain}
 #result div{padding:14px;display:flex;gap:10px;flex-wrap:wrap}
 #result button{flex:1;padding:14px;border:none;border-radius:10px;font-weight:bold;min-width:100px}
 #galeri{position:fixed;inset:0;background:#000;z-index:30;display:none;flex-direction:column}
@@ -47,164 +52,76 @@ body{background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif;overflow
 #galeri .top button{background:#22c55e;border:none;padding:8px 14px;border-radius:8px;font-weight:bold}
 #grid{flex:1;overflow-y:auto;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #grid .item{position:relative;border-radius:12px;overflow:hidden;border:1px solid #333}
-#grid .item img{width:100%;height:150px;object-fit:cover;display:block}
+#grid .item img,#grid .item video{width:100%;height:150px;object-fit:cover;display:block}
 #grid .item p{font-size:10px;padding:6px;color:#cbd5e1;background:#111}
 #grid .del{position:absolute;top:5px;right:5px;background:red;border:none;color:#fff;border-radius:50%;width:26px;height:26px}
 #empty{text-align:center;color:#666;margin-top:60px;font-size:13px}
 #toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#22c55e;color:#000;padding:10px 16px;border-radius:20px;font-size:13px;font-weight:bold;z-index:50;display:none}
 #focusBox{position:fixed;width:70px;height:70px;border:2px solid #22c55e;border-radius:50%;z-index:9;display:none;pointer-events:none}
-#folderInfo{position:fixed;top:92px;left:12px;z-index:10;background:rgba(0,0,0,.6);padding:5px 9px;border-radius:12px;font-size:11px;color:#a7f3d0;display:none}
+#recTimer{position:fixed;top:92px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:6px 14px;border-radius:20px;font-weight:bold;font-size:14px;display:none;z-index:10}
+#modeLabel{position:fixed;bottom:118px;right:12px;background:rgba(0,0,0,.6);padding:5px 9px;border-radius:12px;font-size:11px;z-index:10}
 </style>
 </head>
 <body>
 <div id="splash"><img src="icon-192.png" onerror="this.style.display='none'"><h1>STAMP<span>LOK</span></h1><p>Stempel Waktu & Lokasi, Sekali Jepret</p><p style="color:#22c55e">by MasTech29</p></div>
-<div id="toast">✅ Tersimpan ke Galeri HP!</div>
+<div id="toast">✅ Tersimpan!</div>
 <video id="video" autoplay playsinline muted></video>
 <div id="focusBox"></div>
-<div class="header"><b>◉ STAMPLOK</b><span id="statusGPS">📍 Mencari GPS...</span></div>
-<div id="topBtns">
-  <button id="btnFlash" onclick="toggleFlash()" title="Flash">⚡</button>
-  <button id="btnFocus" onclick="autoFocus()" title="Fokus Otomatis">🎯</button>
-  <button onclick="gantiFolder()" title="Ganti Folder">📁</button>
-</div>
-<div id="folderInfo">📁 Folder tersimpan ✓</div>
+<div id="recTimer">● 00:00</div>
+<div class="header"><b>◉ STAMPLOK</b><span id="statusGPS">📍 Memuat Lokasi...</span></div>
+<div id="topBtns"><button id="btnFlash" onclick="toggleFlash()">⚡</button><button onclick="autoFocus()">🎯</button><button onclick="refreshGPS()">📍</button></div>
 <div class="stamp">
 <div class="r1"><span>●</span> <span id="tgl">-</span> | <span id="jam">-</span></div>
 <div class="r2" id="koor">Lat - | Lon -</div>
 <div class="r3" id="arah">🧭 - | Alt - | Kec -</div>
-<div class="r4" id="alamat">Mencari lokasi...</div>
+<div class="r4" id="alamat">Memuat lokasi terakhir...</div>
 <div class="r5" id="idFoto">ID: SPL-</div>
 </div>
+<div id="modeLabel">📸 Mode: FOTO</div>
 <div class="controls">
 <div class="mini" onclick="bukaGaleri()"><img id="thumb" src=""></div>
-<button id="snap" onclick="jepret()"></button>
+<button id="snap" onclick="onSnap()"></button>
 <button class="btn" onclick="switchCam()">🔄</button>
 </div>
-<div class="footer">© 2026 <b>MasTech29</b> - StampLok. All Rights Reserved.</div>
-<canvas id="canvas"></canvas>
-<div id="result"><img id="hasilImg"><div><button style="background:#334155;color:#fff" onclick="ulangi()">Ulangi</button><button style="background:#22c55e" onclick="simpanKeGaleriHP()">📸 Simpan ke Galeri HP</button><button style="background:#fff" onclick="share()">📤 Share</button></div><p style="text-align:center;font-size:11px;color:#94a3b8;padding:0 14px 14px">© 2026 MasTech29 - Foto otomatis tersimpan di Galeri Aplikasi & Galeri HP</p></div>
-<div id="galeri">
-<div class="top"><b>🖼️ Galeri StampLok</b><button onclick="tutupGaleri()">✕ Tutup</button></div>
-<div id="grid"></div>
-<div id="empty">Belum ada foto bro.<br>Jepret dulu, langsung ke-save disini.</div>
-<p style="text-align:center;font-size:11px;color:#64748b;padding:10px">© 2026 MasTech29 - StampLok</p>
+<div style="position:fixed;bottom:95px;left:0;right:0;display:flex;justify-content:center;gap:10px;z-index:10">
+<button onclick="setMode('foto')" id="btnFoto" class="btn active" style="width:auto;padding:0 16px;border-radius:20px;font-size:13px">📸 Foto</button>
+<button onclick="setMode('video')" id="btnVideo" class="btn" style="width:auto;padding:0 16px;border-radius:20px;font-size:13px">🎥 Video</button>
 </div>
+<div class="footer">© 2026 <b>MasTech29</b> - StampLok. All Rights Reserved.</div>
+<canvas id="canvas"></canvas><canvas id="recCanvas"></canvas>
+<div id="result"><img id="hasilImg"><video id="hasilVideo" controls playsinline style="display:none"></video><div><button style="background:#334155;color:#fff" onclick="ulangi()">Ulangi</button><button style="background:#22c55e" onclick="simpanKeGaleriHP()">📸 Simpan ke Galeri HP</button><button style="background:#fff" onclick="share()">📤 Share</button></div><p style="text-align:center;font-size:11px;color:#94a3b8;padding:0 14px 14px">© 2026 MasTech29 - Foto / Video otomatis tersimpan di Galeri Aplikasi & Galeri HP</p></div>
+<div id="galeri"><div class="top"><b>🖼️ Galeri StampLok</b><button onclick="tutupGaleri()">✕ Tutup</button></div><div id="grid"></div><div id="empty">Belum ada foto bro.<br>Jepret dulu, langsung ke-save disini.</div><p style="text-align:center;font-size:11px;color:#64748b;padding:10px">© 2026 MasTech29 - StampLok</p></div>
 <script>
-setTimeout(()=>{ document.getElementById('splash').style.display='none'; },1500);
+setTimeout(()=>{ document.getElementById('splash').style.display='none'; },1200);
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
-let stream, facing='environment', lat=0, lon=0, heading=0, alt=0, speed=0, alamatTxt='Mencari lokasi...';
+let stream, facing='environment', lat=0, lon=0, heading=0, alt=0, speed=0;
 let galeriData = JSON.parse(localStorage.getItem('stamplok_galeri')||'[]');
-let folderHandle = null;
-let flashOn = false;
+let flashOn=false, lastAlamatFetch=0, lastLatAlamat=0, lastLonAlamat=0, alamatTxt='Mencari lokasi...';
+let mode='foto', mediaRecorder=null, recordedChunks=[], isRecording=false, recStart=0, recTimerInt=null, rafId=null;
 
-// ===== 1. FOLDER INGAT SELAMANYA (IndexedDB) =====
-function idb(){
-  return new Promise((res,rej)=>{
-    let r=indexedDB.open('stamplok-db',1);
-    r.onupgradeneeded=()=>{ r.result.createObjectStore('keys'); };
-    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
-  });
-}
-async function saveFolderHandle(h){
-  try{ let db=await idb(); let tx=db.transaction('keys','readwrite'); tx.objectStore('keys').put(h,'folder'); }catch(e){}
-}
-async function loadFolderHandle(){
-  try{ let db=await idb(); return new Promise(res=>{ let tx=db.transaction('keys','readonly'); let q=tx.objectStore('keys').get('folder'); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }); }catch(e){ return null; }
-}
-async function verifyPermission(h, readWrite){
-  let opts={mode: readWrite?'readwrite':'read'};
-  if(await h.queryPermission(opts)==='granted') return true;
-  if(await h.requestPermission(opts)==='granted') return true;
-  return false;
-}
-// Coba ambil folder lama pas buka app, tanpa nanya picker
-async function restoreFolder(){
-  if(!window.showDirectoryPicker) return;
-  folderHandle = await loadFolderHandle();
-  if(folderHandle){
-    let ok = await verifyPermission(folderHandle, true);
-    if(ok){
-      document.getElementById('folderInfo').style.display='block';
-      document.getElementById('folderInfo').innerText='📁 Folder: '+folderHandle.name+' ✓ Tersimpan';
-    } else { folderHandle=null; }
-  }
-}
-restoreFolder();
-async function gantiFolder(){
-  try{
-    let h = await window.showDirectoryPicker({mode:'readwrite'});
-    folderHandle=h; await saveFolderHandle(h);
-    document.getElementById('folderInfo').style.display='block';
-    document.getElementById('folderInfo').innerText='📁 Folder: '+h.name+' ✓ Tersimpan';
-    showToast('✅ Folder diganti & diingat!');
-  }catch(e){}
-}
-
+// ===== GPS NGEBUT =====
+let savedLoc = JSON.parse(localStorage.getItem('stamplok_last_loc')||'null');
+if(savedLoc){ lat=savedLoc.lat; lon=savedLoc.lon; alt=savedLoc.alt||0; alamatTxt=savedLoc.alamat||alamatTxt; document.getElementById('koor').innerText='Lat '+lat.toFixed(6)+' | Lon '+lon.toFixed(6)+' (Terakhir)'; document.getElementById('alamat').innerText=alamatTxt.split(',').slice(0,4).join(','); document.getElementById('statusGPS').innerText='📍 Lokasi Terakhir • Mencari GPS Baru...'; lastLatAlamat=lat; lastLonAlamat=lon; }
+function saveLoc(){ try{ localStorage.setItem('stamplok_last_loc', JSON.stringify({lat,lon,alt,alamat:alamatTxt,time:Date.now()})); }catch(e){} }
+async function fetchAlamat(){ let now=Date.now(); if(now-lastAlamatFetch<5000) return; let d=Math.hypot(lat-lastLatAlamat, lon-lastLonAlamat)*111000; if(d<50 && lastAlamatFetch!==0) return; lastAlamatFetch=now; lastLatAlamat=lat; lastLonAlamat=lon; try{ let c=new AbortController(); setTimeout(()=>c.abort(),4000); let r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lon,{signal:c.signal}); let j=await r.json(); if(j.display_name){ alamatTxt=j.display_name; document.getElementById('alamat').innerText=alamatTxt.split(',').slice(0,4).join(','); saveLoc(); } }catch(e){} }
+function onPos(pos){ lat=pos.coords.latitude; lon=pos.coords.longitude; alt=Math.round(pos.coords.altitude||0); speed=Math.round((pos.coords.speed||0)*3.6); document.getElementById('koor').innerText='Lat '+lat.toFixed(6)+' | Lon '+lon.toFixed(6); document.getElementById('statusGPS').innerText='📍 GPS Aktif • ±'+Math.round(pos.coords.accuracy||0)+'m'; saveLoc(); fetchAlamat(); }
+function refreshGPS(){ showToast('📍 Mencari GPS Ulang...'); navigator.geolocation.getCurrentPosition(onPos, ()=>{}, {enableHighAccuracy:false, timeout:3000, maximumAge:10000}); navigator.geolocation.getCurrentPosition(onPos, ()=>{}, {enableHighAccuracy:true, timeout:10000, maximumAge:0}); }
+if(navigator.geolocation){ refreshGPS(); navigator.geolocation.watchPosition(onPos, ()=>{ document.getElementById('statusGPS').innerText='📍 Nyalain GPS bro'; }, {enableHighAccuracy:true, timeout:15000, maximumAge:5000}); }
 function showToast(t){ let el=document.getElementById('toast'); el.innerText=t; el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
 
-// ===== 2. KAMERA + FLASH + FOKUS =====
+// ===== MODE FOTO / VIDEO =====
+function setMode(m){ mode=m; document.getElementById('btnFoto').classList.toggle('active', m==='foto'); document.getElementById('btnVideo').classList.toggle('active', m==='video'); document.getElementById('snap').classList.toggle('videoMode', m==='video'); document.getElementById('modeLabel').innerText = m==='foto' ? '📸 Mode: FOTO' : '🎥 Mode: VIDEO'; if(isRecording) stopVideo(); }
+function onSnap(){ if(mode==='foto') jepret(); else { if(!isRecording) startVideo(); else stopVideo(); } }
+
+// ===== KAMERA + FLASH + FOKUS =====
 async function startCam(){
   if(stream) stream.getTracks().forEach(t=>t.stop());
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing, width:{ideal:1920}, height:{ideal:1080}},audio:false});
-    document.getElementById('video').srcObject=stream;
-    flashOn=false; document.getElementById('btnFlash').classList.remove('on');
-    // Fokus otomatis continuous kalo HP support
-    let track=stream.getVideoTracks()[0];
-    try{ let caps=track.getCapabilities(); if(caps.focusMode && caps.focusMode.includes('continuous')){ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); } }catch(e){}
-  }catch(e){ alert('Izinin kamera dulu bro'); }
+  try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing, width:{ideal:1920}, height:{ideal:1080}},audio:true}); document.getElementById('video').srcObject=stream; flashOn=false; document.getElementById('btnFlash').classList.remove('on'); let track=stream.getVideoTracks()[0]; try{ let caps=track.getCapabilities(); if(caps.focusMode && caps.focusMode.includes('continuous')){ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); } }catch(e){} }catch(e){ alert('Izinin kamera + mic dulu bro'); }
 }
 function switchCam(){ facing=facing==='environment'?'user':'environment'; startCam(); }
-
-// FLASH / SENTER
-async function toggleFlash(){
-  let track=stream && stream.getVideoTracks()[0];
-  if(!track){ showToast('Kamera belum siap'); return; }
-  let caps=track.getCapabilities();
-  if(!caps.torch){ showToast('HP ini ga support flash di web bro, pake senter HP aja'); return; }
-  try{
-    flashOn=!flashOn;
-    await track.applyConstraints({advanced:[{torch:flashOn}]});
-    document.getElementById('btnFlash').classList.toggle('on', flashOn);
-    showToast(flashOn?'⚡ Flash ON':'⚡ Flash OFF');
-  }catch(e){ showToast('Flash gagal bro'); }
-}
-// FOKUS - Tap layar / Tombol
-async function autoFocus(){
-  let track=stream && stream.getVideoTracks()[0];
-  if(!track) return;
-  try{
-    let caps=track.getCapabilities();
-    if(caps.focusMode){
-      // Coba manual fokus jarak menengah dulu, balik ke continuous
-      if(caps.focusMode.includes('manual') && caps.focusDistance){
-        await track.applyConstraints({advanced:[{focusMode:'manual', focusDistance:0.5}]});
-        setTimeout(async()=>{ try{ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){} },800);
-      } else if(caps.focusMode.includes('single-shot')){
-        await track.applyConstraints({advanced:[{focusMode:'single-shot'}]});
-      }
-    }
-    showToast('🎯 Fokus!');
-  }catch(e){ showToast('Fokus otomatis HP bro'); }
-}
-// Tap di video = fokus disitu
-document.getElementById('video').addEventListener('click', async (e)=>{
-  let box=document.getElementById('focusBox');
-  box.style.left=(e.clientX-35)+'px'; box.style.top=(e.clientY-35)+'px'; box.style.display='block';
-  setTimeout(()=>box.style.display='none',700);
-  // Kirim titik fokus kalo support pointsOfInterest
-  let track=stream && stream.getVideoTracks()[0];
-  if(track){
-    try{
-      let caps=track.getCapabilities();
-      if(caps.pointsOfInterest){
-        let x=e.clientX/window.innerWidth, y=e.clientY/window.innerHeight;
-        await track.applyConstraints({advanced:[{pointsOfInterest:[{x:x,y:y}]}]});
-      }
-    }catch(err){}
-  }
-  autoFocus();
-});
+async function toggleFlash(){ let track=stream && stream.getVideoTracks()[0]; if(!track) return; let caps=track.getCapabilities(); if(!caps.torch){ showToast('HP ga support flash web, nyalain senter HP aja bro'); return; } try{ flashOn=!flashOn; await track.applyConstraints({advanced:[{torch:flashOn}]}); document.getElementById('btnFlash').classList.toggle('on', flashOn); }catch(e){} }
+async function autoFocus(){ let track=stream && stream.getVideoTracks()[0]; if(!track) return; try{ let caps=track.getCapabilities(); if(caps.focusMode){ if(caps.focusMode.includes('manual') && caps.focusDistance){ await track.applyConstraints({advanced:[{focusMode:'manual', focusDistance:0.5}]}); setTimeout(async()=>{ try{ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){} },800); } else if(caps.focusMode.includes('single-shot')){ await track.applyConstraints({advanced:[{focusMode:'single-shot'}]}); } } showToast('🎯 Fokus!'); }catch(e){} }
+document.getElementById('video').addEventListener('click', async (e)=>{ let box=document.getElementById('focusBox'); box.style.left=(e.clientX-35)+'px'; box.style.top=(e.clientY-35)+'px'; box.style.display='block'; setTimeout(()=>box.style.display='none',700); autoFocus(); });
 
 function updateJam(){
   let n=new Date(); let hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][n.getDay()];
@@ -215,75 +132,97 @@ function updateJam(){
   return {tgl,jam,id};
 }
 setInterval(updateJam,1000); updateJam();
-if(navigator.geolocation){
-  navigator.geolocation.watchPosition(async pos=>{
-    lat=pos.coords.latitude; lon=pos.coords.longitude; alt=Math.round(pos.coords.altitude||0); speed=Math.round((pos.coords.speed||0)*3.6);
-    document.getElementById('koor').innerText='Lat '+lat.toFixed(6)+' | Lon '+lon.toFixed(6);
-    document.getElementById('statusGPS').innerText='📍 GPS Aktif';
-    try{ let r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lon); let j=await r.json(); alamatTxt=j.display_name||alamatTxt; document.getElementById('alamat').innerText=alamatTxt.split(',').slice(0,4).join(','); }catch(e){}
-  },()=>{ document.getElementById('statusGPS').innerText='📍 Nyalain GPS bro'; },{enableHighAccuracy:true});
-}
-window.addEventListener('deviceorientation',e=>{
-  if(e.alpha!=null){ heading=Math.round(360-e.alpha); let a=['Utara','Timur Laut','Timur','Tenggara','Selatan','Barat Daya','Barat','Barat Laut'][Math.round(heading/45)%8]; document.getElementById('arah').innerText='🧭 '+heading+'° '+a+' | Alt '+alt+'m | Kec '+speed+' km/j'; }
-});
-function jepret(){
-  let v=document.getElementById('video'); let c=document.getElementById('canvas');
-  if(!v.videoWidth){ alert('Kamera belum siap bro'); return; }
-  c.width=v.videoWidth; c.height=v.videoHeight; let ctx=c.getContext('2d'); ctx.drawImage(v,0,0);
-  let {tgl,jam,id}=updateJam(); let w=c.width, h=c.height;
+window.addEventListener('deviceorientation',e=>{ if(e.alpha!=null){ heading=Math.round(360-e.alpha); let a=['Utara','Timur Laut','Timur','Tenggara','Selatan','Barat Daya','Barat','Barat Laut'][Math.round(heading/45)%8]; document.getElementById('arah').innerText='🧭 '+heading+'° '+a+' | Alt '+alt+'m | Kec '+speed+' km/j'; } });
+
+// Gambar stempel ke canvas (dipake foto & video)
+function drawStamp(ctx,w,h){
+  let {tgl,jam,id}=updateJam();
   ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,h-250,w,250); ctx.fillStyle='#22c55e'; ctx.fillRect(0,h-250,12,250);
   ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(w*0.028)+'px Arial'; ctx.fillText('STAMPLOK  |  '+tgl+'  |  '+jam, 30, h-200);
   ctx.font=Math.round(w*0.022)+'px Arial'; ctx.fillStyle='#cbd5e1'; ctx.fillText('Lat '+lat.toFixed(6)+'  |  Lon '+lon.toFixed(6), 30, h-160);
   ctx.fillStyle='#fbbf24'; ctx.fillText('Arah '+heading+' derajat  |  Alt '+alt+'m  |  Kec '+speed+' km/j', 30, h-125);
-  ctx.fillStyle='#94a3b8'; ctx.font=Math.round(w*0.02)+'px Arial'; let alm = alamatTxt.length>75?alamatTxt.slice(0,75)+'...':alamatTxt; ctx.fillText(alm, 30, h-90);
+  ctx.fillStyle='#94a3b8'; ctx.font=Math.round(w*0.02)+'px Arial'; let alm=alamatTxt.length>75?alamatTxt.slice(0,75)+'...':alamatTxt; ctx.fillText(alm, 30, h-90);
   ctx.fillStyle='#22c55e'; ctx.fillText('ID: '+id, 30, h-55);
   ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(w*0.02)+'px Arial'; ctx.fillText('(c) 2026 MasTech29 - StampLok', 30, h-25);
-  let url=c.toDataURL('image/jpeg',0.9);
-  document.getElementById('hasilImg').src=url; document.getElementById('thumb').src=url;
-  document.getElementById('result').style.display='flex'; window.lastFoto=url; window.lastInfo=tgl+' | '+jam;
-  simpanOtomatis(url, window.lastInfo);
+  return {tgl,jam,id};
 }
-function simpanOtomatis(url, info){
-  galeriData.unshift({img:url, info:info, time:Date.now()});
+function jepret(){
+  let v=document.getElementById('video'); let c=document.getElementById('canvas');
+  if(!v.videoWidth){ alert('Kamera belum siap bro'); return; }
+  c.width=v.videoWidth; c.height=v.videoHeight; let ctx=c.getContext('2d'); ctx.drawImage(v,0,0);
+  let info=drawStamp(ctx,c.width,c.height);
+  let url=c.toDataURL('image/jpeg',0.9);
+  document.getElementById('hasilImg').style.display='block'; document.getElementById('hasilVideo').style.display='none';
+  document.getElementById('hasilImg').src=url; document.getElementById('thumb').src=url;
+  document.getElementById('result').style.display='flex'; window.lastFoto=url; window.lastType='foto'; window.lastInfo=info.tgl+' | '+info.jam;
+  simpanOtomatis(url, window.lastInfo, 'foto');
+}
+
+// ===== VIDEO RECORDING =====
+function startVideo(){
+  let v=document.getElementById('video'); if(!v.videoWidth){ alert('Kamera belum siap bro'); return; }
+  // Canvas buat rekam (video + stempel jalan)
+  let rc=document.getElementById('recCanvas'); rc.width=v.videoWidth; rc.height=v.videoHeight;
+  let rctx=rc.getContext('2d');
+  function loop(){ rctx.drawImage(v,0,0,rc.width,rc.height); drawStamp(rctx,rc.width,rc.height); if(isRecording) rafId=requestAnimationFrame(loop); }
+  isRecording=true; recordedChunks=[];
+  document.getElementById('snap').classList.add('recording');
+  document.getElementById('recTimer').style.display='block'; recStart=Date.now();
+  recTimerInt=setInterval(()=>{ let s=Math.floor((Date.now()-recStart)/1000); let m=String(Math.floor(s/60)).padStart(2,'0'); let ss=String(s%60).padStart(2,'0'); document.getElementById('recTimer').innerText='● '+m+':'+ss; },500);
+  rafId=requestAnimationFrame(loop);
+  // Gabungin video canvas + audio mic
+  let canvasStream=rc.captureStream(30);
+  let audioTrack=stream.getAudioTracks()[0];
+  let combined=new MediaStream([...canvasStream.getVideoTracks(), ...(audioTrack?[audioTrack]:[])]);
+  let mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  mediaRecorder=new MediaRecorder(combined,{mimeType:mime, videoBitsPerSecond:5000000});
+  mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop=onVideoStop;
+  mediaRecorder.start(250);
+  showToast('🎥 Merekam...');
+}
+function stopVideo(){
+  if(!isRecording) return;
+  isRecording=false; clearInterval(recTimerInt);
+  document.getElementById('snap').classList.remove('recording'); document.getElementById('recTimer').style.display='none';
+  cancelAnimationFrame(rafId);
+  if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
+}
+function onVideoStop(){
+  let blob=new Blob(recordedChunks,{type:'video/webm'});
+  let url=URL.createObjectURL(blob);
+  window.lastFoto=url; window.lastBlob=blob; window.lastType='video';
+  let {tgl,jam}=updateJam(); window.lastInfo=tgl+' | '+jam+' (Video)';
+  document.getElementById('hasilImg').style.display='none'; document.getElementById('hasilVideo').style.display='block';
+  document.getElementById('hasilVideo').src=url;
+  document.getElementById('result').style.display='flex';
+  // Simpan ke galeri dalam app (video ga bisa di localStorage, jadi simpan blob URL sementara)
+  showToast('✅ Video selesai! Pencet Simpan');
+}
+function simpanOtomatis(url, info, type){
+  // Foto aja yg di-save ke localStorage, video terlalu gede
+  if(type!=='foto') return;
+  galeriData.unshift({img:url, info:info, time:Date.now(), type:'foto'});
   if(galeriData.length>30) galeriData.pop();
   try{ localStorage.setItem('stamplok_galeri', JSON.stringify(galeriData)); }catch(e){}
   renderGaleri();
 }
+// ===== SIMPAN TANPA IZIN FOLDER =====
 async function simpanKeGaleriHP(){
   try{
-    let blob = await (await fetch(window.lastFoto)).blob();
-    let nama = 'StampLok_'+Date.now()+'.jpg';
-    if(window.showDirectoryPicker){
-      if(!folderHandle){
-        showToast('Pilih Folder Pictures / StampLok bro... (terakhir kali)');
-        folderHandle = await window.showDirectoryPicker({mode:'readwrite'});
-        await saveFolderHandle(folderHandle);
-        document.getElementById('folderInfo').style.display='block';
-        document.getElementById('folderInfo').innerText='📁 Folder: '+folderHandle.name+' ✓ Tersimpan';
-      } else {
-        // Cek izin masih ada ga, kalo ga ada minta izin cepet (bukan pilih folder baru)
-        let ok = await verifyPermission(folderHandle, true);
-        if(!ok){ showToast('Izin folder habis, pilih lagi bro'); folderHandle=null; return simpanKeGaleriHP(); }
-      }
-      let fileHandle = await folderHandle.getFileHandle(nama, {create:true});
-      let writable = await fileHandle.createWritable();
-      await writable.write(blob); await writable.close();
-      showToast('✅ Tersimpan ke Galeri HP!');
-      return;
-    }
-    if(window.showSaveFilePicker){
-      let handle = await window.showSaveFilePicker({suggestedName:nama, types:[{description:'JPEG Image', accept:{'image/jpeg':['.jpg']}}]});
-      let writable = await handle.createWritable(); await writable.write(blob); await writable.close();
-      showToast('✅ Tersimpan ke Galeri HP!');
-      return;
-    }
-    let a = document.createElement('a'); a.href=window.lastFoto; a.download=nama; document.body.appendChild(a); a.click(); a.remove();
-    showToast('✅ Tersimpan! Cek Galeri HP -> Download');
-  }catch(e){ console.log(e); }
+    let nama = window.lastType==='video' ? 'StampLok_'+Date.now()+'.webm' : 'StampLok_'+Date.now()+'.jpg';
+    let blob = window.lastType==='video' ? window.lastBlob : await (await fetch(window.lastFoto)).blob();
+    let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nama; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+    showToast('✅ Tersimpan ke Galeri HP! Cek folder Download');
+  }catch(e){ showToast('Gagal simpan bro'); }
 }
-function simpanKeGaleri(){ simpanKeGaleriHP(); }
-function ulangi(){ document.getElementById('result').style.display='none'; }
-async function share(){ try{ let r=await fetch(window.lastFoto); let b=await r.blob(); let f=new File([b],'stamplok.jpg',{type:'image/jpeg'}); await navigator.share({files:[f], title:'StampLok by MasTech29'}); }catch(e){ alert('Share gagal, pake Simpan ke Galeri HP aja bro'); } }
+function ulangi(){ document.getElementById('result').style.display='none'; document.getElementById('hasilVideo').pause(); }
+async function share(){
+  try{
+    if(window.lastType==='video'){ let f=new File([window.lastBlob],'stamplok.webm',{type:'video/webm'}); await navigator.share({files:[f], title:'StampLok by MasTech29'}); }
+    else { let r=await fetch(window.lastFoto); let b=await r.blob(); let f=new File([b],'stamplok.jpg',{type:'image/jpeg'}); await navigator.share({files:[f], title:'StampLok by MasTech29'}); }
+  }catch(e){ alert('Share gagal, pake Simpan ke Galeri HP aja bro'); }
+}
 function bukaGaleri(){ renderGaleri(); document.getElementById('galeri').style.display='flex'; }
 function tutupGaleri(){ document.getElementById('galeri').style.display='none'; }
 function renderGaleri(){
@@ -292,7 +231,7 @@ function renderGaleri(){
   galeriData.forEach((item,i)=>{
     let div=document.createElement('div'); div.className='item';
     div.innerHTML='<img src="'+item.img+'"><p>'+item.info+'</p><button class="del" onclick="hapusFoto('+i+',event)">✕</button>';
-    div.onclick=()=>{ document.getElementById('hasilImg').src=item.img; window.lastFoto=item.img; document.getElementById('galeri').style.display='none'; document.getElementById('result').style.display='flex'; };
+    div.onclick=()=>{ document.getElementById('hasilImg').src=item.img; window.lastFoto=item.img; window.lastType='foto'; document.getElementById('galeri').style.display='none'; document.getElementById('hasilImg').style.display='block'; document.getElementById('hasilVideo').style.display='none'; document.getElementById('result').style.display='flex'; };
     grid.appendChild(div);
   });
   if(galeriData[0]) document.getElementById('thumb').src=galeriData[0].img;
